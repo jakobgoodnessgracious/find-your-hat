@@ -52,6 +52,9 @@ class Field {
         for (let i = 0; i < 100; i+=1 ){
             newlines += '\n';
         }
+        // process.stdout.write('\u001B[2J\u001B[0;0f');
+        // process.stdout.cursorTo(0);
+        // term(newlines);
         term.reset();
         term(this.toString());
     }
@@ -60,7 +63,7 @@ class Field {
         const isHatOrHoleOrStartOrPath = (location) => {
             const [x,y] = location;
             const value = field[y][x];
-            return value === hole || value === hat || value === pathCharacter || (!x && !y);
+            return value === hole || value === hat || value === pathCharacter || value === activePathCharacter || (!x && !y);
         }
 
         let holeX = 0;
@@ -402,5 +405,5 @@ class Field {
         this._field[this._yPlayerLocation][this._xPlayerLocation] = activePathCharacter;
     }
 }
-new Field(Field.generateField(10, 20, 40),{ randomStart: true, hardMode: true ,simulate: true}).play();
+new Field(Field.generateField(60, 120, 20),{ randomStart: true, hardMode: true, simulate: true}).play();
 // new Field(Field.generateField(5, 10)).play();

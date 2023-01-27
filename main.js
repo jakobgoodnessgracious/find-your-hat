@@ -1,7 +1,5 @@
 const term = require('terminal-kit').terminal;
 const setTimeout = require('timers/promises').setTimeout;
-const EventEmitter = require('events');
-const eventEmitter = new EventEmitter();
 const hat = '^R^^';
 const hole = '^cO';
 const fieldCharacter = '^Y░';
@@ -48,13 +46,10 @@ class Field {
 
     print() {
         // probably remove . . . or figure out how to not reprint?
-        let newlines = '';
-        for (let i = 0; i < 100; i+=1 ){
-            newlines += '\n';
-        }
-        // process.stdout.write('\u001B[2J\u001B[0;0f');
-        // process.stdout.cursorTo(0);
-        // term(newlines);
+        // let newlines = '';
+        // for (let i = 0; i < 100; i+=1 ){
+        //     newlines += '\n';
+        // }
         term.reset();
         term(this.toString());
     }
@@ -102,8 +97,6 @@ class Field {
             const [holeX, holeY] = Field.getEmptyLoc(field, height, width);
             field[holeY][holeX] = hole;
         }
-
-        // console.log('this.height', Field.height);
 
         return field;
     }
@@ -251,7 +244,6 @@ class Field {
             if (this.hardMode && this.moved && simulate) {
                 this.addRandomNumHoles();
                }   
-            // console.log('simXPlayerLocation', simXPlayerLocation, 'simYPlayerLocation',simYPlayerLocation)
             let prioritizedDirs = this.getDirectionsOfHat().filter((val)=> val);
             if (!visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation]){
                 visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation] = this.getCurrentLRUDLocInfo(simXPlayerLocation, simYPlayerLocation);
@@ -282,9 +274,7 @@ class Field {
             if (this._field[simYPlayerLocation][simXPlayerLocation] === hat) {
                 arrived = true;
                 canSolve = true;
-                // console.log('can solve!!!!');
             }
-            // console.log('prioritizedDirs', prioritizedDirs);
             if (prioritizedDirs.length) {
                 // sort based off of next direction not visited being priority
                 const sortedPrioritizedDirs = prioritizedDirs.sort((a,b) => {
@@ -298,13 +288,11 @@ class Field {
                     return 0;
 
                 });
-                // console.log('sortedPri', sortedPrioritizedDirs);
                 const nextDirection = sortedPrioritizedDirs[0];
 
                 if (!visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation].bannedDirs.includes(nextDirection)){
                     visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation].bannedDirs.push(nextDirection);
                 }
-                // console.log('nextDirection', nextDirection, 'info', visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation]);
                 const [, nextXLoc, nextYLoc ] = directionInfo[nextDirection];
                 simXPlayerLocation = nextXLoc;
                 simYPlayerLocation = nextYLoc;
@@ -312,7 +300,6 @@ class Field {
                 if (simulate) {
                     this.markFieldLocation();
                     this.print();
-                 //    const direction = prompt('\nUse the arrow keys to move the cursor.');
                     term('\nUse the arrow keys to move the cursor.')
                     this.storeLastLocation();
                     this.updateLocation(nextDirection);
@@ -321,9 +308,7 @@ class Field {
                     this.checkAtHat();
                     await setTimeout(500);
                 }
-                // console.log('next  simXPlayerLocation', simXPlayerLocation, 'simYPlayerLocation', simYPlayerLocation);
             } else {
-                // console.log('cant solve');
                 if (simulate){
                     this.endGame('No possible solution!')
                 }
@@ -333,8 +318,6 @@ class Field {
 
         // return 2 or 1 dirs dirs either x + y, x, or y, e.g., ['left', 'down'], ['right'], ['down']
         
-        // console.log('dir of hat', this.getDirectionsOfHat());
-        // console.log('getCurrentLRUDLocInfo', this.getCurrentLRUDLocInfo());
         return canSolve;
        
     }
@@ -386,7 +369,6 @@ class Field {
                 this.addRandomNumHoles();
                }
                this.print();
-            //    const direction = prompt('\nUse the arrow keys to move the cursor.');
                term('\nUse the arrow keys to move the cursor.')
                const direction = await this.termPrompt();
                this.storeLastLocation();
@@ -405,5 +387,4 @@ class Field {
         this._field[this._yPlayerLocation][this._xPlayerLocation] = activePathCharacter;
     }
 }
-new Field(Field.generateField(60, 120, 20),{ randomStart: true, hardMode: true, simulate: true}).play();
-// new Field(Field.generateField(5, 10)).play();
+new Field(Field.generateField(10, 20, 20),{ randomStart: true, hardMode: true, simulate: false}).play();

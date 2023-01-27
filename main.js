@@ -1,20 +1,21 @@
-const prompt = require('prompt-sync')({sigint: true});
 const term = require('terminal-kit').terminal;
-const hat = '^r^^';
+const setTimeout = require('timers/promises').setTimeout;
+const EventEmitter = require('events');
+const eventEmitter = new EventEmitter();
+const hat = '^R^^';
 const hole = '^cO';
-const fieldCharacter = '^y░';
-const pathCharacter = '^b*';
-const activePathCharacter = '^w*';
+const fieldCharacter = '^Y░';
+const pathCharacter = '^B*';
+const activePathCharacter = '^W*';
 const LEFT = 'LEFT';
 const RIGHT = 'RIGHT';
 const UP = 'UP';
 const DOWN = 'DOWN';
 
 
-
 class Field {
     constructor(field = [], opts) {
-        const  {hardMode = false, randomStart = false} = opts || {};
+        const  {hardMode = false, randomStart = false, simulate = false} = opts || {};
         this._field = field;
         this.hardMode = hardMode;
         if (randomStart) {
@@ -29,6 +30,7 @@ class Field {
             this._xLastPlayerLocation = 0;
             this._yLastPlayerLocation = 0;
         }
+        this._simulate = simulate;
         this.isGameOver = false;
     }
 
@@ -50,8 +52,7 @@ class Field {
         for (let i = 0; i < 100; i+=1 ){
             newlines += '\n';
         }
-        // console.log(newlines);
-        term.clear();
+        term.reset();
         term(this.toString());
     }
 
@@ -197,10 +198,10 @@ class Field {
         const downChar = this._field[downY] ? this._field[downY][downX] : null;
 
         return {
-            left: [leftChar, leftX, leftY],
-            right: [rightChar, rightX, rightY],
-            up: [upChar, upX, upY],
-            down: [downChar, downX, downY] 
+            LEFT: [leftChar, leftX, leftY],
+            RIGHT: [rightChar, rightX, rightY],
+            UP: [upChar, upX, upY],
+            DOWN: [downChar, downX, downY] 
         }
     }
 
@@ -209,26 +210,26 @@ class Field {
         let udDirection = '';
         const [hatX, hatY] = this.getHatLocation();
         if (hatX > this._xPlayerLocation) {
-            lrDirection = 'right';
+            lrDirection = RIGHT;
         }
 
         if (hatX < this._xPlayerLocation) {
-            lrDirection = 'left';
+            lrDirection = LEFT;
         }
 
         if (hatY > this._yPlayerLocation) {
-            udDirection = 'down';
+            udDirection = DOWN;
         }
 
         if (hatY < this._yPlayerLocation) {
-            udDirection = 'up';
+            udDirection = UP;
         }
 
         return [lrDirection, udDirection];
     }
 
     get LRUD() {
-        return ['right', 'left', 'up', 'down'];
+        return [RIGHT, LEFT, UP, DOWN];
     }
 
     storeLastLocation(){
@@ -236,21 +237,23 @@ class Field {
         this._yLastPlayerLocation = this._yPlayerLocation;
     }
 
-    canSolve() {
+    async canSolve(simulate) {
         // this need to be redone
         const visitedLocationsInfo = {};
         let simXPlayerLocation = this._xPlayerLocation;
         let simYPlayerLocation = this._yPlayerLocation;
         let canSolve = false;
-        const directions = this.LRUD;
         let arrived = false;
-        let iter = 0;
-        while (!arrived) {            
+        while (!arrived) {         
+            if (this.hardMode && this.moved && simulate) {
+                this.addRandomNumHoles();
+               }   
             // console.log('simXPlayerLocation', simXPlayerLocation, 'simYPlayerLocation',simYPlayerLocation)
             let prioritizedDirs = this.getDirectionsOfHat().filter((val)=> val);
             if (!visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation]){
                 visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation] = this.getCurrentLRUDLocInfo(simXPlayerLocation, simYPlayerLocation);
             }
+            visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation] = {...visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation], ...this.getCurrentLRUDLocInfo(simXPlayerLocation, simYPlayerLocation)};
             const directionInfo = visitedLocationsInfo[simXPlayerLocation + '-' + simYPlayerLocation];
             // gather possible directions to try, prioritized by hat direction, not out of bounds, not a hole, 
             // and not attempted direction from location before
@@ -302,15 +305,27 @@ class Field {
                 const [, nextXLoc, nextYLoc ] = directionInfo[nextDirection];
                 simXPlayerLocation = nextXLoc;
                 simYPlayerLocation = nextYLoc;
+                // clean this up by making this more reusable
+                if (simulate) {
+                    this.markFieldLocation();
+                    this.print();
+                 //    const direction = prompt('\nUse the arrow keys to move the cursor.');
+                    term('\nUse the arrow keys to move the cursor.')
+                    this.storeLastLocation();
+                    this.updateLocation(nextDirection);
+                    this.checkOutOfBounds();
+                    this.checkInHole();
+                    this.checkAtHat();
+                    await setTimeout(500);
+                }
                 // console.log('next  simXPlayerLocation', simXPlayerLocation, 'simYPlayerLocation', simYPlayerLocation);
             } else {
                 // console.log('cant solve');
+                if (simulate){
+                    this.endGame('No possible solution!')
+                }
                 break;
             }
-            iter += 1;
-            // if (iter === 7){
-            //     break;
-            // }
         }
 
         // return 2 or 1 dirs dirs either x + y, x, or y, e.g., ['left', 'down'], ['right'], ['down']
@@ -356,23 +371,27 @@ class Field {
     }
 
     async play(){
-        while (!this.canSolve()) {
+        while (!await this.canSolve()) {
             this.reGenerateField();
         }
-        while (!this.isGameOver){
-           this.markFieldLocation();
-           if (this.hardMode && this.moved) {
-            this.addRandomNumHoles();
-           }
-           this.print();
-        //    const direction = prompt('\nUse the arrow keys to move the cursor.');
-           term('\nUse the arrow keys to move the cursor.')
-           const direction = await this.termPrompt();
-           this.storeLastLocation();
-           this.updateLocation(direction);
-           this.checkOutOfBounds();
-           this.checkInHole();
-           this.checkAtHat();
+        if (this._simulate) {
+            await this.canSolve(true);
+        } else {
+            while (!this.isGameOver){
+               this.markFieldLocation();
+               if (this.hardMode && this.moved) {
+                this.addRandomNumHoles();
+               }
+               this.print();
+            //    const direction = prompt('\nUse the arrow keys to move the cursor.');
+               term('\nUse the arrow keys to move the cursor.')
+               const direction = await this.termPrompt();
+               this.storeLastLocation();
+               this.updateLocation(direction);
+               this.checkOutOfBounds();
+               this.checkInHole();
+               this.checkAtHat();
+            }
         }
         console.log(this.gameOverText);
         Field.terminate();
@@ -383,5 +402,5 @@ class Field {
         this._field[this._yPlayerLocation][this._xPlayerLocation] = activePathCharacter;
     }
 }
-new Field(Field.generateField(10, 20, 20),{hardMode: true, randomStart: true}).play();
+new Field(Field.generateField(10, 20, 40),{ randomStart: true, hardMode: true ,simulate: true}).play();
 // new Field(Field.generateField(5, 10)).play();

@@ -6,7 +6,6 @@
   "author": "Jakob",
   "license": "ISC",
   "dependencies": {
-    "prompt-sync": "^4.1.7",
     "terminal-kit": "^3.0.0"
   }
 }

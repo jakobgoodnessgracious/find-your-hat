@@ -1,8 +1,15 @@
 const prompt = require('prompt-sync')({sigint: true});
-const hat = '^';
-const hole = 'O';
-const fieldCharacter = '░';
-const pathCharacter = '*';
+const term = require('terminal-kit').terminal;
+const hat = '^r^^';
+const hole = '^cO';
+const fieldCharacter = '^y░';
+const pathCharacter = '^b*';
+const activePathCharacter = '^w*';
+const LEFT = 'LEFT';
+const RIGHT = 'RIGHT';
+const UP = 'UP';
+const DOWN = 'DOWN';
+
 
 
 class Field {
@@ -14,9 +21,13 @@ class Field {
             const [xStart, yStart] = Field.getEmptyLoc(this._field, this.getHeight(), this.getWidth());
             this._xPlayerLocation = xStart;
             this._yPlayerLocation = yStart;
+            this._xLastPlayerLocation = xStart;
+            this._yLastPlayerLocation = yStart;
         } else {
             this._xPlayerLocation = 0;
             this._yPlayerLocation = 0;
+            this._xLastPlayerLocation = 0;
+            this._yLastPlayerLocation = 0;
         }
         this.isGameOver = false;
     }
@@ -39,8 +50,9 @@ class Field {
         for (let i = 0; i < 100; i+=1 ){
             newlines += '\n';
         }
-        console.log(newlines);
-        console.log(this.toString());
+        // console.log(newlines);
+        term.clear();
+        term(this.toString());
     }
 
     static getEmptyLoc(field, height, width) {
@@ -93,7 +105,7 @@ class Field {
     }
 
     endGame(gameOverText) {
-        this.gameOverText = gameOverText;
+        this.gameOverText = '\n' + gameOverText;
         this.isGameOver = true;
     }
     
@@ -219,6 +231,11 @@ class Field {
         return ['right', 'left', 'up', 'down'];
     }
 
+    storeLastLocation(){
+        this._xLastPlayerLocation = this._xPlayerLocation;
+        this._yLastPlayerLocation = this._yPlayerLocation;
+    }
+
     canSolve() {
         // this need to be redone
         const visitedLocationsInfo = {};
@@ -309,22 +326,36 @@ class Field {
     }
 
     updateLocation(lrud) {
-        const lrudLower = lrud.trim().toLowerCase();
-        if (lrudLower === 'l') {
+        if (lrud === LEFT) {
             this._xPlayerLocation -= 1;
-        } else if (lrudLower === 'r') {
+        } else if (lrud === RIGHT) {
             this._xPlayerLocation += 1;
-        } else if (lrudLower === 'u') {
+        } else if (lrud === UP) {
             this._yPlayerLocation -= 1;
-        } else if (lrudLower === 'd') {
+        } else if (lrud === DOWN) {
             this._yPlayerLocation += 1;
         } else {
-            this.endGame('Incorrect character. Please type: \'l\',\'r\',\'u\', or \'d\'');
+            this.endGame('Incorrect character. Please use the arrow keys: \'LEFT\', \'RIGHT\', \'UP\', or \'DOWN\'');
         }
 
     }
 
-    play(){
+    static terminate() {
+        process.exit();
+    }
+
+    termPrompt() {
+        const prom = new Promise((resolve, reject)=>{
+            term.grabInput();
+            term.on( 'key' , function( name , matches , data ) {
+                resolve(name);
+                if ( name === 'CTRL_C' ) { Field.terminate(); }
+            } );
+        });
+        return prom;
+    }
+
+    async play(){
         while (!this.canSolve()) {
             this.reGenerateField();
         }
@@ -334,18 +365,23 @@ class Field {
             this.addRandomNumHoles();
            }
            this.print();
-           var direction = prompt('Which way?');
+        //    const direction = prompt('\nUse the arrow keys to move the cursor.');
+           term('\nUse the arrow keys to move the cursor.')
+           const direction = await this.termPrompt();
+           this.storeLastLocation();
            this.updateLocation(direction);
            this.checkOutOfBounds();
            this.checkInHole();
            this.checkAtHat();
         }
         console.log(this.gameOverText);
+        Field.terminate();
     }
 
     markFieldLocation(){
-        this._field[this._yPlayerLocation][this._xPlayerLocation] = pathCharacter;
+        this._field[this._yLastPlayerLocation][this._xLastPlayerLocation] = pathCharacter;
+        this._field[this._yPlayerLocation][this._xPlayerLocation] = activePathCharacter;
     }
 }
-new Field(Field.generateField(10, 20, 50),{hardMode: true, randomStart: true}).play();
+new Field(Field.generateField(10, 20, 20),{hardMode: true, randomStart: true}).play();
 // new Field(Field.generateField(5, 10)).play();
